@@ -9,11 +9,11 @@
 ------------MOD CODE -------------------------
 
 
-G.localization.misc.dictionary["k_fusion"] = "Fusion"
+G.localization.misc.dictionary["k_fusion"] = "合体"
 G.localization.misc.dictionary["k_flipped_ex"] = "Flipped!"
-G.localization.misc.dictionary["k_copied_ex"] = "Cloned!"
+G.localization.misc.dictionary["k_copied_ex"] = "复制！"
 G.localization.misc.dictionary["k_in_tact_ex"] = "In-Tact!"
-G.localization.misc.dictionary["b_fuse"] = "FUSE"
+G.localization.misc.dictionary["b_fuse"] = "合体"
 FusionJokers = {}
 FusionJokers.fusions = {
 	{ jokers = {
@@ -69,13 +69,27 @@ FusionJokers.fusions = {
 		{ name = "j_smiley", carry_stat = nil, extra_stat = false }
 	}, result_joker = "j_uncanny_face", cost = 8 },
 	{ jokers = {
+		{ name = "j_ride_the_bus", carry_stat = nil, extra_stat = false },
+		{ name = "j_drivers_license", carry_stat = nil, extra_stat = false }
+	}, result_joker = "j_commercial_driver", cost = 8 },
+	{ jokers = {
 		{ name = "j_hiker", carry_stat = nil, extra_stat = false },
 		{ name = "j_dusk", carry_stat = nil, extra_stat = false }
 	}, result_joker = "j_camping_trip", cost = 10 },
 }
 
+Fusables = {}
+function FJInclude()
+    for _, t in ipairs(FusionJokers.fusions) do
+        local j1 = t.jokers[1].name
+        local j2 = t.jokers[2].name
+        table.insert(Fusables, {j1, j2})
+    end
+end
+FJInclude()
 
 function FusionJokers.fusions:add_fusion(joker1, carry_stat1, extra1, joker2, carry_stat2, extra2, result_joker, cost)
+    table.insert(Fusables, {joker1,joker2})
 	table.insert(self, 
 		{ jokers = {
 			{ name = joker1, carry_stat = carry_stat1, extra_stat = extra1 },
@@ -373,21 +387,38 @@ end
 local new_roundref = new_round
 function new_round()
 	new_roundref()
-	local chaos = find_joker('Collectible Chaos Card')
-	G.GAME.current_round.free_rerolls = G.GAME.current_round.free_rerolls or 0
-    G.GAME.current_round.free_rerolls = G.GAME.current_round.free_rerolls + #chaos
-	calculate_reroll_cost(true)
+	G.E_MANAGER:add_event(Event({
+		trigger = 'after',
+		delay = 0.1,
+		func = function()
+			local chaos = find_joker('Collectible Chaos Card')
+			G.GAME.current_round.free_rerolls = G.GAME.current_round.free_rerolls or 0
+			G.GAME.current_round.free_rerolls = G.GAME.current_round.free_rerolls + #chaos
+			calculate_reroll_cost(true)
+		return true end
+	}))
 end
+
+-- local calculate_reroll_costref = calculate_reroll_cost
+-- function calculate_reroll_cost(skip_increment)
+-- 	local chaos = find_joker('Collectible Chaos Card')
+-- 	sendDebugMessage("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA")
+-- 	sendDebugMessage(inspect(chaos))
+-- 	G.GAME.current_round.free_rerolls = G.GAME.current_round.free_rerolls or 0
+--     G.GAME.current_round.free_rerolls = G.GAME.current_round.free_rerolls + #chaos
+-- 	calculate_reroll_costref(skip_increment)
+-- end
 
 
 local calculate_dollar_bonusref = Card.calculate_dollar_bonus
 function Card:calculate_dollar_bonus()
-	calculate_dollar_bonusref(self)
+	local retval = calculate_dollar_bonusref(self)
 	if self.ability.set == "Joker" then
         if self.ability.name == 'Golden Egg' then
             return self.ability.extra.dollars
         end
 	end
+	return retval
 end
 
 -- local shatterref = Card.shatter
@@ -415,22 +446,26 @@ end
 function SMODS.INIT.FusionJokers()
 	local mod_id = "FusionJokers"
 	local mod_obj = SMODS.findModByID(mod_id)
-	
-	table.insert(G.P_JOKER_RARITY_POOLS, {})
-	table.insert(G.C.RARITY, HEX("F7D762"))
+
+	local SMODS_inject_jokers_ref = SMODS.injectJokers
+	function SMODS.injectJokers()
+		G.P_JOKER_RARITY_POOLS["fusionJokersFusion"] = {}
+		local movedTable = G.P_JOKER_RARITY_POOLS["fusionJokersFusion"]
+		table.insert(G.P_JOKER_RARITY_POOLS, 5, movedTable)
+		SMODS_inject_jokers_ref()
+	end
 
 	loc_colour("mult", nil)
+	G.C.RARITY[5] = HEX('F7D762')
     G.ARGS.LOC_COLOURS["fusion"] = G.C.RARITY[5]
 
-	
-
 	local diamond_bard_def = {
-		name = "Diamond Bard",
+		name = "方片吟游者",
 		text = {
-			"Played cards with {C:diamonds}Diamond{} suit give",
-            "{C:money}$#1#{}, as well as {C:mult}+#2#{} Mult for every ",
-			"{C:money}$#3#{} you have when scored",
-			"{C:inactive}(#4# + #5#)"
+			"打出的{C:diamonds}方片{}花色牌",
+            "在计分时给予{C:money}$#1#",
+			"且每拥有{C:money}$#3#{}，{C:mult}+#2#{}倍率",
+			"{C:inactive}（#4# + #5#）"
 		}
 	}
 
@@ -462,17 +497,17 @@ function SMODS.INIT.FusionJokers()
 
 
 	local heart_paladin_def = {
-		name = "Heart Paladin",
+		name = "红桃圣骑士",
 		text = {
-			"Played cards with {C:hearts}Heart{} suit give",
-            "{X:mult,C:white}X#1#{} Mult when scored.", 
-			"{C:green}#2# in #3#{} chance to re-trigger",
-			"{C:inactive}(#4# + #5#)"
+			"打出的{C:hearts}红桃{}花色牌",
+            "在计分时给予{X:mult,C:white} X#1# {}倍率",
+			"且有{C:green}#2#/#3#{}的几率重新触发",
+			"{C:inactive}（#4# + #5#）"
 		}
 	}
   
 	local heart_paladin = SMODS.Joker:new("Heart Paladin", "heart_paladin", {extra = {
-		odds = 3, Xmult = 1.5, joker1 = "j_lusty_joker", joker2 = "j_bloodstone"
+		odds = 2, Xmult = 1.5, joker1 = "j_lusty_joker", joker2 = "j_bloodstone"
 	}}, { x = 0, y = 0 }, heart_paladin_def, 5, 12, true, false, true, true)
 	SMODS.Sprite:new("j_heart_paladin", mod_obj.path, "j_heart_paladin.png", 71, 95, "asset_atli"):register();
 	heart_paladin:register()
@@ -507,12 +542,12 @@ function SMODS.INIT.FusionJokers()
 	
 
 	local spade_archer_def = {
-		name = "Spade Archer",
+		name = "黑桃神射手",
 		text = {
-			"Played cards with {C:spades}Spade{} suit give",
-            "{C:chips}+#1#{} Chips when scored. Gains {C:chips}+#2#{} ", 
-			"chips when 5 {C:spades}Spades{} are played",
-			"{C:inactive}(#3# + #4#)"
+			"打出的{C:spades}黑桃{}花色牌",
+            "在计分时给予{C:chips}+#1#{}筹码",
+			"若5张均为{C:spades}黑桃{}，筹码永久{C:chips}+#2#{}",
+			"{C:inactive}（#3# + #4#）"
 		}
 	}
 
@@ -855,14 +890,14 @@ function SMODS.INIT.FusionJokers()
 
 
 	local dementia_joker_def = {
-		name = "Dementia Joker",
+		name = "痴呆症小丑",
 		text = {
-			"{C:mult}+#1#{} Mult for each {C:attention}Joker{} card.",
-			"{C:green}#2# in #3#{} chance to {C:attention}clone{} if ",
-			"not {C:dark_edition}Negative{} after you beat a blind",
-			"{C:inactive}(Currently {C:mult}+#4#{C:inactive} Mult)",
-			"{C:inactive}(#5# + #6#)"
-			
+			"每有一张{C:attention}小丑牌{C:mult}+#1#{}倍率",
+			"且击败盲注后，若此牌不为{C:dark_edition}负片{}",
+			"则有{C:green}#2#/#3#{}的几率{C:attention}复制{}自身",
+			"复制体均为{C:dark_edition}负片{}",
+			"{C:inactive}（当前为{C:mult}+#4#{C:inactive}倍率）",
+			"{C:inactive,s:0.8}（#5# + #6#）"
 		}
 	}
 
@@ -909,12 +944,11 @@ function SMODS.INIT.FusionJokers()
 
 
 	local golden_egg_def = {
-		name = "Golden Egg",
+		name = "金蛋",
 		text = {
-			"Gains {C:money}$#1#{} of {C:attention}sell value{}",
-			" at end of round.",
-			" Earn {C:money}$#1#{} at end of round",
-			"{C:inactive}(#2# + #3#)"
+			"回合结束时获得{C:money}$#1#",
+			"且本卡{C:attention}售价{}增加{C:money}$#1#",
+			"{C:inactive}（#2# + #3#）"
 			
 		}
 	}
@@ -945,13 +979,12 @@ function SMODS.INIT.FusionJokers()
 
 	
 	local flag_bearer_def = {
-		name = "Flag Bearer",
+		name = "扛旗人",
 		text = {
-			"{C:mult}+#1#{} Mult per hand played, {C:mult}-#2#{} Mult",
-			"per discard. Mult is multiplied by",
-			" remaining {C:attention}discards{}",
-			"{C:inactive}(Currently {C:mult}+#3#{C:inactive} Mult)",
-			"{C:inactive}(#4# + #5#)"
+			"每次出牌{C:mult}+#1#{}倍率，每次弃牌{C:mult}-#2#{}倍率",
+			"倍率将与剩余{C:attention}弃牌{}次数相乘",
+			"{C:inactive}（当前为{C:mult}+#3#{C:inactive}倍率）",
+			"{C:inactive}（#4# + #5#）"
 			
 		}
 	}
@@ -1002,13 +1035,11 @@ function SMODS.INIT.FusionJokers()
 
 
 	local uncanny_face_def = {
-		name = "Uncanny Face",
+		name = "瘆人鬼脸",
 		text = {
-			"Played {C:attention}face{} cards give {C:chips}+#1#{} Chips and",
-			"{C:mult}+#2#{} Mult for every {C:attention}face{} card",
-			" in the scoring hand",
-			"{C:inactive}(#3# + #4#)"
-			
+			"打出的{C:attention}人头牌{}在计分时",
+			"给予{C:chips}+#1#{}筹码和{C:mult}+#2#{}倍率",
+			"{C:inactive}（#3# + #4#）"
 		}
 	}
 
@@ -1043,12 +1074,13 @@ function SMODS.INIT.FusionJokers()
 
 
 	local commercial_driver_def = {
-		name = "Commercial Driver",
+		name = "商务司机",
 		text = {
-			"{X:mult,C:white} X#1# {} Mult per consecutive hand",
-			"played with a scoring {C:attention}enhanced{} card",
-			"{C:inactive}(Currently {X:mult,C:white}X#2#{C:inactive} Mult)",
-			"{C:inactive}(#3# + #4#)"
+			"打出计分的{C:attention}增强卡牌{}时",
+			"此牌获得{X:mult,C:white} X#1# {}倍率",
+			"不合要求的出牌将重置倍率",
+			"{C:inactive}（当前为{X:mult,C:white}X#2#{C:inactive}倍率）",
+			"{C:inactive}（#3# + #4#）"
 		}
 	}
 
@@ -1152,7 +1184,7 @@ function SMODS.INIT.FusionJokers()
 			text = {
 				"{C:attention}+2{} consumable slots.",
 				"{C:green}#1# in #2#{} chance for played cards",
-				" with {C:stars}Star{} suit to create a",
+				" with {C:星星}Star{} suit to create a",
 				"random {C:spectral}Spectral{} card when scored",
 				"{C:inactive}(#3# + #4#)"
 				
@@ -1201,8 +1233,8 @@ function SMODS.INIT.FusionJokers()
 			name = "Moon Marauder",
 			text = {
 				"{C:green}#1# in #2#{} chance for played cards with",
-				"{C:moons}Moon{} suit to become {C:attention}Glass{} Cards.",
-				"played {C:moons}Moon{} {C:attention}Glass{} cards never shatter",
+				"{C:月亮}Moon{} suit to become {C:attention}Glass{} Cards.",
+				"played {C:月亮}Moon{} {C:attention}Glass{} cards never shatter",
 				"{C:inactive}(#3# + #4#)"
 				
 			}
